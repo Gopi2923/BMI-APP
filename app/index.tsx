@@ -2,12 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Button, Image, TouchableOpacity, Modal, StyleSheet, Linking, ScrollView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import axios from 'axios';
+import YoutubePlayer from 'react-native-youtube-iframe';
 
 const HomePage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [upiLink, setUpiLink] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('pending');
+  const [playing, setPlaying] = useState(true); // State to control autoplay
 
   const checkPaymentSuccess = useCallback(async () => {
     if (paymentStatus !== 'pending') return;
@@ -28,13 +30,13 @@ const HomePage = () => {
     let intervalId;
 
     if (showPaymentModal && transactionId && paymentStatus === 'pending') {
-      intervalId = setInterval(checkPaymentSuccess, 3000); // Check every 3 seconds
+      intervalId = setInterval(checkPaymentSuccess, 3000);
 
       timeoutId = setTimeout(() => {
         if (paymentStatus === 'pending') {
-          setPaymentStatus('failure'); // Set to failure if still pending after 2 minutes
+          setPaymentStatus('failure');
         }
-      }, 120000); // 2 minutes timeout
+      }, 120000);
     }
 
     return () => {
@@ -84,47 +86,56 @@ const HomePage = () => {
       setTransactionId(transaction_id);
     } catch (error) {
       console.error('Error submitting form:', error.response ? error.response.data : error.message);
-      setPaymentStatus('failure'); // Set payment status to failure on error
+      setPaymentStatus('failure');
     }
   };
 
   const redirectToAndroidApp = () => {
-    Linking.openURL('intent://launch/#Intent;scheme=https;package=com.burra.cowinemployees;end');
+    Linking.openURL('intent://#Intent;package=com.burra.cowinemployees;end');
   };
+  
 
   const closeModal = () => {
     setShowPaymentModal(false);
-    setPaymentStatus('pending'); // Reset payment status when closing the modal
+    setPaymentStatus('pending');
   };
 
   useEffect(() => {
     if (paymentStatus === 'success') {
       setTimeout(() => {
         redirectToAndroidApp();
-      }, 2000); // Redirect after showing success modal for 2 seconds
+      }, 2000);
     } else if (paymentStatus === 'failure') {
       setTimeout(() => {
         setShowPaymentModal(false);
         setPaymentStatus('pending');
-      }, 2000); // Close modal after showing failure modal for 2 seconds
+      }, 2000);
     }
   }, [paymentStatus]);
 
-  console.log("UPI Link:", upiLink); // Debugging UPI Link
+  const onStateChange = (state) => {
+    if (state === 'ended') {
+      setPlaying(true); // Restart video when it ends
+    }
+  };
+
+  const togglePlaying = () => {
+    setPlaying(!playing);
+  };
 
   return (
     <ScrollView style={styles.container}>
       {/* Logo and Title */}
       <View style={styles.headerContainer}>
-        <Image source={require('../../assets/images/logo.png')} style={styles.logo} />
-        <Text style={styles.title}>Health ATM (Vitals Checking Machine)</Text>
+        <Image source={require('../assets/images/logo.png')} style={styles.logo} />
+        <Text style={styles.title}>{ `Health ATM \n(Vitals Checking Machine) `}</Text>
       </View>
 
       <Text style={styles.subtitle}>Check Your Vitals, Instant Report</Text>
 
       <TouchableOpacity style={styles.instantReportButton} onPress={handleInstantReportClick}>
         <Text style={styles.buttonText}>Check Your Vitals</Text>
-        <Image source={require('../../assets/images/click.gif')} style={styles.clickImage} />
+        <Image source={require('../assets/images/click.gif')} style={styles.clickImage} />
       </TouchableOpacity>
 
       {/* Payment Modal */}
@@ -135,7 +146,7 @@ const HomePage = () => {
               <>
                 <Text style={styles.paymentText}>Pay 99/- INR to Proceed</Text>
                 {upiLink ? (
-                  <QRCode value={upiLink} size={328} />
+                  <QRCode value={upiLink} size={300} />
                 ) : (
                   <Text>Loading payment link...</Text>
                 )}
@@ -163,14 +174,40 @@ const HomePage = () => {
         <Text>Body Fat / ದೇಹದ ಕೊಬ್ಬು</Text>
       </View>
 
+      <View>
+        <Text>Total Body Water / ಒಟ್ಟು ದೇಹದ ನೀರು</Text>
+        <Text>Basal Metabolic Rate / ಮೂಲವ್ಯೂಪಚಯ ದರ</Text>
+        <Text>Fat Mass / ಕೊಬ್ಬಿನ ಪ್ರಮಾಣ</Text>
+        <Text>Lean/Skeletal Body Mass / ಕುಳಿತ ದೇಹದ ಪ್ರಮಾಣ</Text>
+        <Text>Overweight By / ಅಧಿಕ ತೂಕದ ಮೂಲಕ</Text>
+        <Text>Recommendations / ಶಿಫಾರಸುಗಳು</Text>
+        <Text>Your Lucky Message / ನಿಮ್ಮ ಭಾಗ್ಯದ ಸಂದೇಶ</Text>
+      </View>
+
+      {/* YouTube Video */}
+      <View style={styles.videoContainer}>
+        <YoutubePlayer
+          height={200}
+          play={playing} // Controls autoplay
+          videoId={'Erhv6vECfPU'}  // Replace with your video ID
+          onChangeState={onStateChange}
+          playerVars={{
+            autoplay: 1, // Auto-play the video
+            playlist: 'Erhv6vECfPU', // Required to enable looping
+          }}
+        />
+        <Button title={playing ? "Pause Video" : "Play Video"} onPress={togglePlaying} />
+      </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  // Your existing styles here...
   container: {
     flex: 1,
-    padding: 20,
+    padding: 10,
+    backgroundColor: '#fff',
   },
   headerContainer: {
     flexDirection: 'row',
@@ -184,7 +221,7 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   subtitle: {
@@ -202,22 +239,20 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 26,
     marginRight: 10,
   },
   clickImage: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 55,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    width: 300,
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 10,
@@ -228,14 +263,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   successText: {
-    fontSize: 24,
     color: 'green',
+    fontSize: 22,
   },
   failureText: {
-    fontSize: 24,
     color: 'red',
+    fontSize: 18,
   },
   parametersSection: {
+    marginVertical: 20,
+  },
+  videoContainer: {
     marginTop: 20,
   },
 });
