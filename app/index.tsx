@@ -91,7 +91,17 @@ const HomePage = () => {
   };
 
   const redirectToAndroidApp = () => {
-    Linking.openURL('intent://#Intent;package=com.burra.cowinemployees;end');
+    Linking.openURL('intent://#Intent;package=com.burra.cowinemployees;end')
+      .then(success => {
+        if (success) {
+          console.log('App opened successfully');
+        } else {
+          console.error('Failed to open app');
+        }
+      })
+      .catch(error => {
+        console.error('Error opening app:', error);
+      });
   };
   
 
