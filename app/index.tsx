@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Button, Image, TouchableOpacity, Modal, StyleSheet, Linking, ScrollView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import axios from 'axios';
-import YoutubePlayer from 'react-native-youtube-iframe';
 
 const HomePage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -194,20 +193,6 @@ const HomePage = () => {
         <Text>Your Lucky Message / ನಿಮ್ಮ ಭಾಗ್ಯದ ಸಂದೇಶ</Text>
       </View>
 
-      {/* YouTube Video */}
-      <View style={styles.videoContainer}>
-        <YoutubePlayer
-          height={200}
-          play={playing} // Controls autoplay
-          videoId={'Erhv6vECfPU'}  // Replace with your video ID
-          onChangeState={onStateChange}
-          playerVars={{
-            autoplay: 1, // Auto-play the video
-            playlist: 'Erhv6vECfPU', // Required to enable looping
-          }}
-        />
-        <Button title={playing ? "Pause Video" : "Play Video"} onPress={togglePlaying} />
-      </View>
     </ScrollView>
   );
 };
