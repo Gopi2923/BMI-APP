@@ -14,8 +14,8 @@ const ParameterList = () => {
           <Text style={styles.item}><Icon name="apple-alt" size={24} /> Nutritional Status / ಪೋಷಕ ಸ್ಥಿತಿ</Text>
           <Text style={styles.item}><Icon name="weight-hanging" size={24} /> Ideal Body Weight / ಆದರ್ಶ ದೇಹದ ತೂಕ</Text>
           <Text style={styles.item}><Icon name="percentage" size={24} /> Body Fat / ದೇಹದ ಕೊಬ್ಬು</Text>
-        </View>
-        <View style={styles.list}>
+        {/* </View>
+        <View style={styles.list}> */}
           <Text style={styles.item}><Icon name="water" size={24} /> Total Body Water / ಒಟ್ಟು ದೇಹದ ನೀರು</Text>
           <Text style={styles.item}><Icon name="burn" size={24} /> Basal Metabolic Rate / ಮೂಲವ್ಯೂಪಚಯ ದರ</Text>
           <Text style={styles.item}><Icon name="weight" size={24} /> Fat Mass / ಕೊಬ್ಬಿನ ಪ್ರಮಾಣ</Text>
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 80,
+    padding: 10,
     backgroundColor: '#f5f5f5',  // Customize this for TV view
   },
   listContainer: {
