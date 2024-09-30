@@ -1,275 +1,291 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Button, Image, TouchableOpacity, Modal, StyleSheet, Linking, ScrollView } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, Text, Image, TouchableOpacity, Modal, ActivityIndicator, StyleSheet, ToastAndroid } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faCircleCheck } from '@fortawesome/free-solid-svg-icons';
+import ParameterList from '../app/Components/ParameterList';
+import qrimg1 from '../assets/images/qr-img-40.jpeg';
+import qrimg2 from '../assets/images/qr-img-99.jpeg';
 
 const HomePage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [upiLink, setUpiLink] = useState('');
-  const [transactionId, setTransactionId] = useState('');
+  const [paymentOption, setPaymentOption] = useState('');
+  const [amountOption, setAmountOption] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [playing, setPlaying] = useState(true); // State to control autoplay
+  const [isLoading, setIsLoading] = useState(false);
 
-  const checkPaymentSuccess = useCallback(async () => {
-    if (paymentStatus !== 'pending') return;
-
-    try {
-      const response = await axios.get(`https://kiosk-q5q4.onrender.com/payment-gateway/paymentStatus/${transactionId}`);
-      if (response.data.data === true) {
-        setPaymentStatus('success');
-      }
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-      setPaymentStatus('failure');
-    }
-  }, [transactionId, paymentStatus]);
-
-  useEffect(() => {
-    let timeoutId;
-    let intervalId;
-
-    if (showPaymentModal && transactionId && paymentStatus === 'pending') {
-      intervalId = setInterval(checkPaymentSuccess, 3000);
-
-      timeoutId = setTimeout(() => {
-        if (paymentStatus === 'pending') {
-          setPaymentStatus('failure');
-        }
-      }, 120000);
-    }
-
-    return () => {
-      clearInterval(intervalId);
-      clearTimeout(timeoutId);
-    };
-  }, [transactionId, showPaymentModal, paymentStatus, checkPaymentSuccess]);
-
-  const generateOrderId = () => {
-    return Math.floor(1000000000 + Math.random() * 9000000000).toString();
-  };
-
-  const handleInstantReportClick = async () => {
+  const handleInstantReportClick = () => {
     setShowPaymentModal(true);
-    const orderId = generateOrderId();
-    try {
-      const token = '367|qM5tv66Rhk8Tm13DlvDkc92KNwVMvAhOuljLB8tA';
-      const transactionData = {
-        amount: '1',
-        description: 'Health ATM Report',
-        name: 'Gopi',
-        email: 'dhanushnm07@gmail.com',
-        mobile: Number('1234567890'),
-        enabledModesOfPayment: 'upi',
-        payment_method: 'UPI_INTENT',
-        source: 'api',
-        order_id: orderId,
-        user_uuid: 'swp_sm_903dd099-3a9e-4243-ac1e-f83f83c30725',
-        other_info: 'api',
-        encrypt_response: 0
-      };
+  };
 
-      const formData2 = new FormData();
-      for (const key in transactionData) {
-        formData2.append(key, transactionData[key]);
-      }
+  const handlePaymentOptionClick = (option) => {
+    setPaymentOption(option);
+    setAmountOption(null); // Reset the amount selection
+  };
 
-      const transactionResponse = await axios.post('https://www.switchpay.in/api/createTransaction', formData2, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+  const handleAmountOptionClick = (amount) => {
+    setAmountOption(amount);
+  };
 
-      const { upi_intent_link, transaction_id } = transactionResponse.data;
-      setUpiLink(upi_intent_link);
-      setTransactionId(transaction_id);
-    } catch (error) {
-      console.error('Error submitting form:', error.response ? error.response.data : error.message);
-      setPaymentStatus('failure');
+  const handleConfirmPayment = () => {
+    const payload = {
+      amount: amountOption,
+      name: 'Dhanush',
+      mobile: 1234567890,
+      paymentMethod: paymentOption,
+    };
+
+    setIsLoading(true);
+
+    // Check if online
+    if (navigator.onLine) {
+      // Proceed with online payment
+      processPayment(payload);
+    } else {
+      // Show an offline message
+      ToastAndroid.show('You are offline. Payment will be processed once online.', ToastAndroid.LONG);
+      setIsLoading(false);
+      setPaymentStatus('success');
     }
   };
 
-  const redirectToAndroidApp = () => {
-    Linking.openURL('intent://#Intent;package=com.burra.cowinemployees;end')
-      .then(success => {
-        if (success) {
-          console.log('App opened successfully');
-        } else {
-          console.error('Failed to open app');
+  const processPayment = (payload) => {
+    fetch('https://kiosk-q5q4.onrender.com/user-reciept/add', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to process payment. Please try again.');
         }
+        return response.json();
       })
-      .catch(error => {
-        console.error('Error opening app:', error);
+      .then((data) => {
+        setIsLoading(false);
+        setPaymentStatus('success');
+        ToastAndroid.show('Payment successful!', ToastAndroid.LONG);
+      })
+      .catch((error) => {
+        setIsLoading(false);
+        ToastAndroid.show('Payment failed. Please try again.', ToastAndroid.LONG);
+        setPaymentStatus('failed');
       });
-  };
-  
-
-  const closeModal = () => {
-    setShowPaymentModal(false);
-    setPaymentStatus('pending');
   };
 
   useEffect(() => {
     if (paymentStatus === 'success') {
       setTimeout(() => {
-        redirectToAndroidApp();
-      }, 2000);
-    } else if (paymentStatus === 'failure') {
-      setTimeout(() => {
-        setShowPaymentModal(false);
-        setPaymentStatus('pending');
-      }, 2000);
+        // Replace with Android deep linking mechanism
+        console.log('Redirecting to Android app...');
+      }, 3000); // Redirect after 3 seconds
     }
   }, [paymentStatus]);
 
-  const onStateChange = (state) => {
-    if (state === 'ended') {
-      setPlaying(true); // Restart video when it ends
-    }
-  };
-
-  const togglePlaying = () => {
-    setPlaying(!playing);
+  const closeModal = () => {
+    setShowPaymentModal(false);
+    setPaymentOption('');
+    setAmountOption(null);
+    setPaymentStatus('pending'); // Reset payment status when closing the modal
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Logo and Title */}
+    <ScrollView>
+    <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Image source={require('../assets/images/logo.png')} style={styles.logo} />
-        <Text style={styles.title}>{ `Health ATM \n(Vitals Checking Machine) `}</Text>
+        <Text style={styles.title}>Health ATM (Vitals Checking Machine)</Text>
       </View>
 
       <Text style={styles.subtitle}>Check Your Vitals, Instant Report</Text>
 
-      <TouchableOpacity style={styles.instantReportButton} onPress={handleInstantReportClick}>
-        <Text style={styles.buttonText}>Check Your Vitals</Text>
-        <Image source={require('../assets/images/click.gif')} style={styles.clickImage} />
-      </TouchableOpacity>
+      <View style={styles.instantReportSection}>
+        <TouchableOpacity style={styles.instantReportButton} onPress={handleInstantReportClick}>
+          <Text style={styles.buttonText}>Check Your Vitals</Text>
+          <Image source={require('../assets/images/click.gif')} style={styles.clickIcon} />
+        </TouchableOpacity>
+      </View>
 
-      {/* Payment Modal */}
       <Modal visible={showPaymentModal} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+              <Text style={styles.closeText}>&times;</Text>
+            </TouchableOpacity>
+
             {paymentStatus === 'pending' && (
               <>
-                <Text style={styles.paymentText}>Pay 99/- INR to Proceed</Text>
-                {upiLink ? (
-                  <QRCode value={upiLink} size={300} />
-                ) : (
-                  <Text>Loading payment link...</Text>
+                {!paymentOption ? (
+                  <>
+                    <Text style={styles.modalTitle}>Select Payment Option</Text>
+                    <View style={styles.paymentOptions}>
+                      <TouchableOpacity onPress={() => handlePaymentOptionClick('QR')}>
+                        <Text style={styles.optionButton}>QR Code</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handlePaymentOptionClick('Cash')}>
+                        <Text style={styles.optionButton}>Cash</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : null}
+
+                {paymentOption && !amountOption && (
+                  <>
+                    <Text style={styles.modalTitle}>Select Amount</Text>
+                    <View style={styles.amountOptions}>
+                      <TouchableOpacity onPress={() => handleAmountOptionClick(40)}>
+                        <Text style={styles.optionButton}>&#8377; 40/-</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleAmountOptionClick(99)}>
+                        <Text style={styles.optionButton}>&#8377; 99/-</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
                 )}
-                <Button title="Close" onPress={closeModal} />
+
+                {amountOption && paymentOption === 'QR' && (
+                  <>
+                    <Text style={styles.modalTitle}>Scan the QR Code for {amountOption}/-</Text>
+                    <Image source={amountOption === 40 ? qrimg1 : qrimg2} style={styles.qrCodeImage} />
+                    <TouchableOpacity style={styles.confirmPaymentButton} onPress={handleConfirmPayment} disabled={isLoading}>
+                      <Text style={styles.buttonText}>{isLoading ? 'Processing...' : 'Confirm Payment'}</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {amountOption && paymentOption === 'Cash' && (
+                  <>
+                    <Text style={styles.modalTitle}>You have selected to pay {amountOption}/- by Cash</Text>
+                    <TouchableOpacity style={styles.confirmPaymentButton} onPress={handleConfirmPayment} disabled={isLoading}>
+                      <Text style={styles.buttonText}>{isLoading ? 'Processing...' : 'Confirm Payment'}</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </>
             )}
+
             {paymentStatus === 'success' && (
-              <Text style={styles.successText}>Payment Successful!</Text>
-            )}
-            {paymentStatus === 'failure' && (
-              <Text style={styles.failureText}>Payment Failed, Please Try Again</Text>
+              <View style={styles.successModal}>
+                <Text style={styles.modalTitle}>Payment Successful!</Text>
+                <FontAwesomeIcon icon={faCircleCheck} size={48} color="#218838" />
+              </View>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* Parameters List */}
-      <View style={styles.parametersSection}>
-        <Text>Age / ವಯಸ್ಸು</Text>
-        <Text>Height / ಎತ್ತರ</Text>
-        <Text>Weight / ತೂಕ</Text>
-        <Text>Body Mass Index / ದೇಹದ ಮಾಪಕ</Text>
-        <Text>Nutritional Status / ಪೋಷಕ ಸ್ಥಿತಿ</Text>
-        <Text>Ideal Body Weight / ಆದರ್ಶ ದೇಹದ ತೂಕ</Text>
-        <Text>Body Fat / ದೇಹದ ಕೊಬ್ಬು</Text>
-      </View>
-
-      <View>
-        <Text>Total Body Water / ಒಟ್ಟು ದೇಹದ ನೀರು</Text>
-        <Text>Basal Metabolic Rate / ಮೂಲವ್ಯೂಪಚಯ ದರ</Text>
-        <Text>Fat Mass / ಕೊಬ್ಬಿನ ಪ್ರಮಾಣ</Text>
-        <Text>Lean/Skeletal Body Mass / ಕುಳಿತ ದೇಹದ ಪ್ರಮಾಣ</Text>
-        <Text>Overweight By / ಅಧಿಕ ತೂಕದ ಮೂಲಕ</Text>
-        <Text>Recommendations / ಶಿಫಾರಸುಗಳು</Text>
-        <Text>Your Lucky Message / ನಿಮ್ಮ ಭಾಗ್ಯದ ಸಂದೇಶ</Text>
-      </View>
-
+      <ParameterList />
+    </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  // Your existing styles here...
   container: {
     flex: 1,
-    padding: 10,
     backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 20,
   },
   logo: {
     width: 100,
     height: 100,
-    resizeMode: 'contain',
   },
   title: {
-    fontSize: 20,
+    fontSize: 32,
     fontWeight: 'bold',
+    marginLeft: 20,
   },
   subtitle: {
-    textAlign: 'center',
-    fontSize: 18,
-    marginBottom: 20,
+    fontSize: 24,
+    marginVertical: 10,
+  },
+  instantReportSection: {
+    marginVertical: 20,
   },
   instantReportButton: {
     backgroundColor: '#007BFF',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+    padding: 10,
+    borderRadius: 5,
     flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 26,
+    fontSize: 18,
     marginRight: 10,
   },
-  clickImage: {
+  clickIcon: {
     width: 50,
     height: 50,
-    borderRadius: 55,
+    borderRadius: 25,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 10,
+    width: '80%',
     alignItems: 'center',
   },
-  paymentText: {
+  closeButton: {
+    alignSelf: 'flex-end',
+  },
+  closeText: {
+    fontSize: 24,
+    color: '#333',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  paymentOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  optionButton: {
     fontSize: 18,
-    marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#007BFF',
+    color: '#fff',
+    borderRadius: 5,
+    textAlign: 'center',
+    margin: 10,
+    minWidth: '40%',
   },
-  successText: {
-    color: 'green',
-    fontSize: 22,
+  amountOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
-  failureText: {
-    color: 'red',
-    fontSize: 18,
+  qrCodeImage: {
+    width: 300,
+    height: 400,
+    marginVertical: 10,
+    borderRadius: 30,
   },
-  parametersSection: {
-    marginVertical: 20,
-  },
-  videoContainer: {
+  confirmPaymentButton: {
+    backgroundColor: '#28a745',
+    padding: 10,
+    borderRadius: 5,
     marginTop: 20,
+  },
+  successModal: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
