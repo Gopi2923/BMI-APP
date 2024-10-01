@@ -43,26 +43,32 @@ const HomePage = () => {
   };
 
   const handleConfirmPayment = async () => {
-    const payload = {
-      amount: amountOption,
-      name: 'Dhanush',
-      mobile: 1234567890,
-      paymentMethod: paymentOption,
-    };
-
-    setIsLoading(true);
-
-    if (isOnline) {
-      // Proceed with online payment
-      processPayment(payload);
-    } else {
-      // Save payment offline
-      await saveOfflinePayment(payload);
+    try {
+      const payload = {
+        amount: amountOption,
+        name: 'Dhanush',
+        mobile: 1234567890,
+        paymentMethod: paymentOption,
+      };
+  
+      setIsLoading(true);
+  
+      if (isOnline) {
+        // Proceed with online payment
+        await processPayment(payload);
+      } else {
+        // Save payment offline
+        await saveOfflinePayment(payload);
+        setIsLoading(false);
+        setPaymentStatus('success');
+        ToastAndroid.show('Offline: Payment will be processed once online.', ToastAndroid.LONG);
+      }
+    } catch (error) {
       setIsLoading(false);
-      setPaymentStatus('success');
-      ToastAndroid.show('Offline: Payment will be processed once online.', ToastAndroid.LONG);
+      console.error('Payment error:', error);
     }
   };
+  
 
   const processPayment = (payload) => {
     fetch('https://kiosk-q5q4.onrender.com/user-reciept/add', {
