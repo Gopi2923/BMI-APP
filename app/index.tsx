@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Text, Image, TouchableOpacity, Modal, ActivityIndicator, StyleSheet, ToastAndroid } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCircleCheck } from '@fortawesome/free-solid-svg-icons';
 import ParameterList from '../app/Components/ParameterList';
@@ -12,6 +14,20 @@ const HomePage = () => {
   const [amountOption, setAmountOption] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [isLoading, setIsLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Monitor network status
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      console.log('Connection status:', state.isConnected);
+      setIsOnline(state.isConnected);
+      if (state.isConnected) {
+        retryOfflinePayments(); // Retry pending payments when online
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+  
 
   const handleInstantReportClick = () => {
     setShowPaymentModal(true);
@@ -26,7 +42,7 @@ const HomePage = () => {
     setAmountOption(amount);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     const payload = {
       amount: amountOption,
       name: 'Dhanush',
@@ -36,15 +52,15 @@ const HomePage = () => {
 
     setIsLoading(true);
 
-    // Check if online
-    if (navigator.onLine) {
+    if (isOnline) {
       // Proceed with online payment
       processPayment(payload);
     } else {
-      // Show an offline message
-      ToastAndroid.show('You are offline. Payment will be processed once online.', ToastAndroid.LONG);
+      // Save payment offline
+      await saveOfflinePayment(payload);
       setIsLoading(false);
       setPaymentStatus('success');
+      ToastAndroid.show('Offline: Payment will be processed once online.', ToastAndroid.LONG);
     }
   };
 
@@ -74,6 +90,38 @@ const HomePage = () => {
       });
   };
 
+  const saveOfflinePayment = async (payment) => {
+    try {
+      let offlinePayments = await AsyncStorage.getItem('offlinePayments');
+      offlinePayments = offlinePayments ? JSON.parse(offlinePayments) : [];
+      offlinePayments.push(payment);
+      await AsyncStorage.setItem('offlinePayments', JSON.stringify(offlinePayments));
+
+      const savedPayments = await AsyncStorage.getItem('offlinePayments');
+      console.log(JSON.parse(savedPayments));  // Check if payments are stored offline
+    } catch (error) {
+      console.error('Error saving payment offline:', error);
+    }
+  };
+
+  const retryOfflinePayments = async () => {
+    try {
+      let offlinePayments = await AsyncStorage.getItem('offlinePayments');
+      offlinePayments = offlinePayments ? JSON.parse(offlinePayments) : [];
+
+       // Log offline payments before retrying
+    console.log('Offline payments before retrying:', offlinePayments);
+      if (offlinePayments.length > 0) {
+        for (const payment of offlinePayments) {
+          processPayment(payment);
+        }
+        await AsyncStorage.removeItem('offlinePayments'); // Clear after retry
+      }
+    } catch (error) {
+      console.error('Error retrying offline payments:', error);
+    }
+  };
+
   useEffect(() => {
     if (paymentStatus === 'success') {
       setTimeout(() => {
@@ -90,93 +138,102 @@ const HomePage = () => {
     setPaymentStatus('pending'); // Reset payment status when closing the modal
   };
 
+  useEffect(() => {
+    const checkOfflinePayments = async () => {
+      const savedPayments = await AsyncStorage.getItem('offlinePayments');
+      console.log('Saved offline payments on load:', JSON.parse(savedPayments));
+    };
+  
+    checkOfflinePayments();
+  }, []);
+  
   return (
     <ScrollView>
-    <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Image source={require('../assets/images/logo.png')} style={styles.logo} />
-        <Text style={styles.title}>Health ATM (Vitals Checking Machine)</Text>
-      </View>
-
-      <Text style={styles.subtitle}>Check Your Vitals, Instant Report</Text>
-
-      <View style={styles.instantReportSection}>
-        <TouchableOpacity style={styles.instantReportButton} onPress={handleInstantReportClick}>
-          <Text style={styles.buttonText}>Check Your Vitals</Text>
-          <Image source={require('../assets/images/click.gif')} style={styles.clickIcon} />
-        </TouchableOpacity>
-      </View>
-
-      <Modal visible={showPaymentModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-              <Text style={styles.closeText}>&times;</Text>
-            </TouchableOpacity>
-
-            {paymentStatus === 'pending' && (
-              <>
-                {!paymentOption ? (
-                  <>
-                    <Text style={styles.modalTitle}>Select Payment Option</Text>
-                    <View style={styles.paymentOptions}>
-                      <TouchableOpacity onPress={() => handlePaymentOptionClick('QR')}>
-                        <Text style={styles.optionButton}>QR Code</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handlePaymentOptionClick('Cash')}>
-                        <Text style={styles.optionButton}>Cash</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : null}
-
-                {paymentOption && !amountOption && (
-                  <>
-                    <Text style={styles.modalTitle}>Select Amount</Text>
-                    <View style={styles.amountOptions}>
-                      <TouchableOpacity onPress={() => handleAmountOptionClick(40)}>
-                        <Text style={styles.optionButton}>&#8377; 40/-</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleAmountOptionClick(99)}>
-                        <Text style={styles.optionButton}>&#8377; 99/-</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-
-                {amountOption && paymentOption === 'QR' && (
-                  <>
-                    <Text style={styles.modalTitle}>Scan the QR Code for {amountOption}/-</Text>
-                    <Image source={amountOption === 40 ? qrimg1 : qrimg2} style={styles.qrCodeImage} />
-                    <TouchableOpacity style={styles.confirmPaymentButton} onPress={handleConfirmPayment} disabled={isLoading}>
-                      <Text style={styles.buttonText}>{isLoading ? 'Processing...' : 'Confirm Payment'}</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                {amountOption && paymentOption === 'Cash' && (
-                  <>
-                    <Text style={styles.modalTitle}>You have selected to pay {amountOption}/- by Cash</Text>
-                    <TouchableOpacity style={styles.confirmPaymentButton} onPress={handleConfirmPayment} disabled={isLoading}>
-                      <Text style={styles.buttonText}>{isLoading ? 'Processing...' : 'Confirm Payment'}</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </>
-            )}
-
-            {paymentStatus === 'success' && (
-              <View style={styles.successModal}>
-                <Text style={styles.modalTitle}>Payment Successful!</Text>
-                <FontAwesomeIcon icon={faCircleCheck} size={48} color="#218838" />
-              </View>
-            )}
-          </View>
+      <View style={styles.container}>
+        <View style={styles.headerContainer}>
+          <Image source={require('../assets/images/logo.png')} style={styles.logo} />
+          <Text style={styles.title}>Health ATM (Vitals Checking Machine)</Text>
         </View>
-      </Modal>
 
-      <ParameterList />
-    </View>
+        <Text style={styles.subtitle}>Check Your Vitals, Instant Report</Text>
+
+        <View style={styles.instantReportSection}>
+          <TouchableOpacity style={styles.instantReportButton} onPress={handleInstantReportClick}>
+            <Text style={styles.buttonText}>Check Your Vitals</Text>
+            <Image source={require('../assets/images/click.gif')} style={styles.clickIcon} />
+          </TouchableOpacity>
+        </View>
+
+        <Modal visible={showPaymentModal} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                <Text style={styles.closeText}>&times;</Text>
+              </TouchableOpacity>
+
+              {paymentStatus === 'pending' && (
+                <>
+                  {!paymentOption ? (
+                    <>
+                      <Text style={styles.modalTitle}>Select Payment Option</Text>
+                      <View style={styles.paymentOptions}>
+                        <TouchableOpacity onPress={() => handlePaymentOptionClick('QR')}>
+                          <Text style={styles.optionButton}>QR Code</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handlePaymentOptionClick('Cash')}>
+                          <Text style={styles.optionButton}>Cash</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : null}
+
+                  {paymentOption && !amountOption && (
+                    <>
+                      <Text style={styles.modalTitle}>Select Amount</Text>
+                      <View style={styles.amountOptions}>
+                        <TouchableOpacity onPress={() => handleAmountOptionClick(40)}>
+                          <Text style={styles.optionButton}>&#8377; 40/-</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleAmountOptionClick(99)}>
+                          <Text style={styles.optionButton}>&#8377; 99/-</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+
+                  {amountOption && paymentOption === 'QR' && (
+                    <>
+                      <Text style={styles.modalTitle}>Scan the QR Code for {amountOption}/-</Text>
+                      <Image source={amountOption === 40 ? qrimg1 : qrimg2} style={styles.qrCodeImage} />
+                      <TouchableOpacity style={styles.confirmPaymentButton} onPress={handleConfirmPayment} disabled={isLoading}>
+                        <Text style={styles.buttonText}>{isLoading ? 'Processing...' : 'Confirm Payment'}</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {amountOption && paymentOption === 'Cash' && (
+                    <>
+                      <Text style={styles.modalTitle}>You have selected to pay {amountOption}/- by Cash</Text>
+                      <TouchableOpacity style={styles.confirmPaymentButton} onPress={handleConfirmPayment} disabled={isLoading}>
+                        <Text style={styles.buttonText}>{isLoading ? 'Processing...' : 'Confirm Payment'}</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </>
+              )}
+
+              {paymentStatus === 'success' && (
+                <View style={styles.successModal}>
+                  <Text style={styles.modalTitle}>Payment Successful!</Text>
+                  <FontAwesomeIcon icon={faCircleCheck} size={48} color="#218838" />
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        <ParameterList />
+      </View>
     </ScrollView>
   );
 };
