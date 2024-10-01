@@ -137,15 +137,6 @@ const HomePage = () => {
     setAmountOption(null);
     setPaymentStatus('pending'); // Reset payment status when closing the modal
   };
-
-  useEffect(() => {
-    const checkOfflinePayments = async () => {
-      const savedPayments = await AsyncStorage.getItem('offlinePayments');
-      console.log('Saved offline payments on load:', JSON.parse(savedPayments));
-    };
-  
-    checkOfflinePayments();
-  }, []);
   
   return (
     <ScrollView>
