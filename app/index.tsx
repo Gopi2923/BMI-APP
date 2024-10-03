@@ -20,6 +20,7 @@ const HomePage = () => {
   // Monitor network status
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
+      console.log('Connection status:', state.isConnected); // Log the network status
       console.log('Connection status:', state.isConnected);
       setIsOnline(state.isConnected);
       if (state.isConnected) {
@@ -72,6 +73,7 @@ const HomePage = () => {
   
 
   const processPayment = (payload) => {
+    console.log('Processing payment payload:', payload); // Log the payload
     fetch('https://kiosk-q5q4.onrender.com/user-reciept/add', {
       method: 'POST',
       headers: {
@@ -79,23 +81,27 @@ const HomePage = () => {
       },
       body: JSON.stringify(payload),
     })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error('Failed to process payment. Please try again.');
-        }
-        return response.json();
-      })
-      .then((data) => {
-        setIsLoading(false);
-        setPaymentStatus('success');
-        ToastAndroid.show('Payment successful!', ToastAndroid.LONG);
-      })
-      .catch((error) => {
-        setIsLoading(false);
-        ToastAndroid.show('Payment failed. Please try again.', ToastAndroid.LONG);
-        setPaymentStatus('failed');
-      });
+    .then((response) => {
+      console.log('Payment response status:', response.status); // Log the response status
+      if (!response.ok) {
+        throw new Error('Failed to process payment. Please try again.');
+      }
+      return response.json();
+    })
+    .then((data) => {
+      setIsLoading(false);
+      setPaymentStatus('success');
+      console.log('Payment success response:', data); // Log success response
+      ToastAndroid.show('Payment successful!', ToastAndroid.LONG);
+    })
+    .catch((error) => {
+      setIsLoading(false);
+      console.error('Payment processing error:', error); // Log error
+      ToastAndroid.show('Payment failed. Please try again.', ToastAndroid.LONG);
+      setPaymentStatus('failed');
+    });
   };
+  
 
   const saveOfflinePayment = async (payment) => {
     try {
